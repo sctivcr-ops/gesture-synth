@@ -26,7 +26,32 @@
         }
         h1 { color: #667eea; margin-bottom: 20px; font-size: 2.5em; }
         p { color: #666; margin-bottom: 20px; font-size: 1.1em; }
-        video { width: 100%; max-width: 500px; background: #000; border-radius: 10px; margin: 20px 0; transform: scaleX(-1); }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        video {
+            width: 100%;
+            display: block;
+            transform: scaleX(-1);
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+        
         .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
         .btn { padding: 15px; font-size: 1em; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; font-weight: bold; transition: all 0.3s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
@@ -44,7 +69,11 @@
         <p>손 제스처로 음악을 만드세요</p>
         <div id="loading" class="loading" style="display:none;">MediaPipe 로딩 중... 🔄</div>
         <div id="content" style="display:none;">
-            <video id="video" playsinline></video>
+            <div class="video-container">
+                <video id="video" playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            
             <div class="controls">
                 <button class="btn" data-chord="0">C Major<br><small>도미솔</small></button>
                 <button class="btn" data-chord="1">F Major<br><small>파라도</small></button>
@@ -68,6 +97,7 @@
         const CHORD_ORDER = ['C', 'F', 'G', 'Am'];
         
         let audioContext, camera, hands, isRunning = false, lastChord = -1, lastTime = 0;
+        let canvasCtx;
 
         function initAudio() {
             if (!audioContext) {
@@ -121,6 +151,13 @@
 
         async function initHands() {
             document.getElementById('loading').style.display = 'block';
+            
+            const canvas = document.getElementById('canvas');
+            const video = document.getElementById('video');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            canvasCtx = canvas.getContext('2d');
+            
             try {
                 hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
                 hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
@@ -135,12 +172,30 @@
         }
 
         function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
+
             if (!isRunning) return;
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                results.multiHandLandmarks.forEach((landmarks) => {
+                    drawConnectors(canvasCtx, landmarks, Hands.HAND_CONNECTIONS, {
+                        color: '#00FF00',
+                        lineWidth: 3
+                    });
+                    
+                    drawLandmarks(canvasCtx, landmarks, {
+                        color: '#FF0000',
+                        lineWidth: 2,
+                        radius: 5
+                    });
+                });
+
                 const landmarks = results.multiHandLandmarks[0];
                 let totalX = 0;
                 landmarks.forEach(lm => totalX += lm.x);
                 const centerX = totalX / landmarks.length;
+                
                 const chordIdx = Math.min(Math.floor(centerX * CHORD_ORDER.length), CHORD_ORDER.length - 1);
                 const now = Date.now();
                 if (chordIdx !== lastChord || now - lastTime > 300) {
@@ -150,7 +205,11 @@
                     document.getElementById('status').textContent = `🎵 재생: ${CHORD_NAMES[chordIdx]}`;
                     updateButtons(chordIdx);
                 }
+            } else {
+                document.getElementById('status').textContent = '손을 화면에 비치세요 👋';
             }
+
+            canvasCtx.restore();
         }
 
         function updateButtons(activeIdx) {
