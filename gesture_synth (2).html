@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Gesture Synth</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.5.1635989137/mediapipe.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            color: #666;
+        }
+
+        .video-section {
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 30px;
+            aspect-ratio: 16/9;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .chord-btn {
+            padding: 20px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .chord-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .chord-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .info-section {
+            background: #f5f7fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-section p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f5f7fa;
+            border-radius: 10px;
+            padding: 15px 20px;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 0.9em;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .hand-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .hand-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .hand-card.left {
+            border-color: #667eea;
+        }
+
+        .hand-card.right {
+            border-color: #764ba2;
+        }
+
+        .hand-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .hand-detail {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .controls {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .chord-btn {
+                padding: 15px;
+                font-size: 1.1em;
+            }
+
+            .status {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Gesture Synth</h1>
+            <p>손 제스처로 음악을 연주하세요</p>
+        </div>
+
+        <div class="loading" id="loading">
+            MediaPipe 로딩 중... 🔄
+        </div>
+
+        <div id="content" style="display: none;">
+            <div class="video-section">
+                <video id="video" playsinline></video>
+                <canvas id="canvas" class="canvas-overlay"></canvas>
+            </div>
+
+            <div class="info-section">
+                <h3>💡 사용 방법</h3>
+                <p>
+                    손을 카메라 앞에서 움직이세요. 손의 위치에 따라 다른 코드가 재생됩니다.
+                    화면 왼쪽에서 오른쪽으로 움직이면 C → F → G → Am 순서로 코드가 변합니다.
+                </p>
+            </div>
+
+            <div class="controls">
+                <button class="chord-btn" data-chord="0">
+                    <div>C Major</div>
+                    <div style="font-size: 0.8em; margin-top: 5px;">도미솔</div>
+                </button>
+                <button class="chord-btn" data-chord="1">
+                    <div>F Major</div>
+                    <div style="font-size: 0.8em; margin-top: 5px;">파라도</div>
+                </button>
+                <button class="chord-btn" data-chord="2">
+                    <div>G Major</div>
+                    <div style="font-size: 0.8em; margin-top: 5px;">솔시레</div>
+                </button>
+                <button class="chord-btn" data-chord="3">
+                    <div>A Minor</div>
+                    <div style="font-size: 0.8em; margin-top: 5px;">라도미</div>
+                </button>
+            </div>
+
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-label">🎹 현재 코드</div>
+                    <div class="status-value" id="currentChord">대기 중...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">🖐️ 감지된 손</div>
+                    <div class="status-value" id="handCount">0개</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">📊 프레임</div>
+                    <div class="status-value" id="fps">0 FPS</div>
+                </div>
+            </div>
+
+            <div id="handInfo" class="hand-info"></div>
+
+            <div class="button-group" style="margin-top: 20px;">
+                <button class="btn btn-primary" id="startBtn">🎬 시작</button>
+                <button class="btn btn-secondary" id="stopBtn" disabled>⏹️ 중지</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const NOTES = {
+            'C': 261.63, 'D': 293.66, 'E': 329.63, 'F': 349.23,
+            'G': 391.99, 'A': 440.00, 'B': 493.88, 'C_high': 523.25
+        };
+
+        const CHORDS = {
+            'C': { notes: ['C', 'E', 'G'], name: 'C Major' },
+            'F': { notes: ['F', 'A', 'C_high'], name: 'F Major' },
+            'G': { notes: ['G', 'B', 'D'], name: 'G Major' },
+            'Am': { notes: ['A', 'C_high', 'E'], name: 'A Minor' }
+        };
+
+        const CHORD_ORDER = ['C', 'F', 'G', 'Am'];
+        let audioContext;
+        let hands;
+        let camera;
+        let canvasElement;
+        let canvasCtx;
+        let isRunning = false;
+        let lastPlayedChord = -1;
+        let lastPlayedTime = 0;
+        const DEBOUNCE_MS = 300;
+        let frameCount = 0;
+        let lastFpsTime = Date.now();
+
+        // Web Audio API 초기화
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 사인파 생성 및 재생
+        function playChord(chordName) {
+            initAudio();
+            
+            const now = audioContext.currentTime;
+            const chordData = CHORDS[chordName];
+            const notes = chordData.notes;
+            const duration = 0.5;
+
+            notes.forEach((noteName, index) => {
+                const freq = NOTES[noteName];
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+            });
+
+            console.log(`🎵 재생: ${chordData.name} (${notes.join(', ')})`);
+        }
+
+        // MediaPipe Hands 초기화
+        async function initializeHands() {
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onResults);
+
+            const video = document.getElementById('video');
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    if (isRunning) {
+                        await hands.send({ image: video });
+                    }
+                },
+                width: 1280,
+                height: 720
+            });
+
+            canvasElement = document.getElementById('canvas');
+            canvasCtx = canvasElement.getContext('2d');
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+        }
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // 손 감지
+            if (results.multiHandLandmarks && results.multiHandedness) {
+                const handInfo = document.getElementById('handInfo');
+                handInfo.innerHTML = '';
+                document.getElementById('handCount').textContent = results.multiHandLandmarks.length + '개';
+
+                results.multiHandLandmarks.forEach((landmarks, index) => {
+                    const handedness = results.multiHandedness[index];
+                    const label = handedness.label;
+
+                    // 손 위치 계산
+                    let totalX = 0;
+                    landmarks.forEach(lm => totalX += lm.x);
+                    const centerX = totalX / landmarks.length;
+
+                    // 코드 선택
+                    const chordIdx = Math.min(
+                        Math.floor(centerX * CHORD_ORDER.length),
+                        CHORD_ORDER.length - 1
+                    );
+
+                    const now = Date.now();
+                    if (chordIdx !== lastPlayedChord || now - lastPlayedTime > DEBOUNCE_MS) {
+                        playChord(CHORD_ORDER[chordIdx]);
+                        lastPlayedChord = chordIdx;
+                        lastPlayedTime = now;
+                        
+                        document.getElementById('currentChord').textContent = 
+                            CHORDS[CHORD_ORDER[chordIdx]].name;
+                        
+                        updateActiveButton(chordIdx);
+                    }
+
+                    // 손 정보 카드
+                    const card = document.createElement('div');
+                    card.className = `hand-card ${label.toLowerCase()}`;
+                    card.innerHTML = `
+                        <div class="hand-name">${label} Hand</div>
+                        <div class="hand-detail">
+                            📍 가로: ${(centerX * 100).toFixed(1)}%<br>
+                            🎹 ${CHORDS[CHORD_ORDER[chordIdx]].name}
+                        </div>
+                    `;
+                    handInfo.appendChild(card);
+
+                    // 손 랜드마크 그리기
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00' });
+                    drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
+                });
+            } else {
+                document.getElementById('handCount').textContent = '0개';
+                document.getElementById('currentChord').textContent = '대기 중...';
+                document.getElementById('handInfo').innerHTML = '';
+            }
+
+            // 코드 영역 표시
+            drawChordSections();
+
+            // FPS 계산
+            frameCount++;
+            const now = Date.now();
+            if (now - lastFpsTime >= 1000) {
+                document.getElementById('fps').textContent = frameCount + ' FPS';
+                frameCount = 0;
+                lastFpsTime = now;
+            }
+
+            canvasCtx.restore();
+        }
+
+        function drawChordSections() {
+            const width = canvasElement.width;
+            const height = canvasElement.height;
+            const sectionWidth = width / CHORD_ORDER.length;
+
+            CHORD_ORDER.forEach((chord, i) => {
+                const x = i * sectionWidth;
+                canvasCtx.fillStyle = 'rgba(102, 126, 234, 0.1)';
+                canvasCtx.fillRect(x, 0, sectionWidth, 50);
+                canvasCtx.strokeStyle = 'rgba(102, 126, 234, 0.3)';
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeRect(x, 0, sectionWidth, 50);
+
+                canvasCtx.fillStyle = 'white';
+                canvasCtx.font = 'bold 20px Arial';
+                canvasCtx.textAlign = 'center';
+                canvasCtx.fillText(
+                    CHORDS[chord].name,
+                    x + sectionWidth / 2,
+                    35
+                );
+            });
+        }
+
+        function updateActiveButton(chordIdx) {
+            document.querySelectorAll('.chord-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === chordIdx);
+            });
+        }
+
+        // 시작/중지 버튼
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            isRunning = true;
+            await camera.start();
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            isRunning = false;
+            camera.stop();
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('currentChord').textContent = '중지됨';
+        });
+
+        // 코드 버튼 클릭 (테스트용)
+        document.querySelectorAll('.chord-btn').forEach((btn, idx) => {
+            btn.addEventListener('click', () => {
+                playChord(CHORD_ORDER[idx]);
+                updateActiveButton(idx);
+            });
+        });
+
+        // 초기화
+        window.addEventListener('load', initializeHands);
+
+        // MediaPipe 유틸리티 로드
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js';
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
